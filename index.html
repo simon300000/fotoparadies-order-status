@@ -188,7 +188,7 @@
 
   <footer class="bg-white border-t py-8 mt-12">
     <div class="container mx-auto px-4 text-center text-gray-600 text-sm">
-      <p>DM Fotoparadise Order Tracker &copy; <span id="current-year"></span> | Auto-updates every 4 hours (7am-10pm)</p>
+      <p>DM Fotoparadise Order Tracker &copy; <span id="current-year"></span> | Auto-checks every hour, refreshes orders older than 4 hours (7am-10pm)</p>
       <p class="mt-1">Data is stored locally in your browser and never sent to any server</p>
     </div>
   </footer>
@@ -648,25 +648,41 @@
           </div>`
       }
 
-      // Smart auto-refresh: every 4 hours, only between 7am-10pm
+      // Smart auto-refresh: immediately on load, then every 1 hour, only refreshing orders older than 4 hours
       const startSmartAutoRefresh = () => {
-        const checkAndRefresh = () => {
+        const smartRefreshOrders = () => {
           const now = new Date()
           const currentHour = now.getHours()
           
           if (currentHour >= ACTIVE_HOURS.start && currentHour < ACTIVE_HOURS.end) {
             console.log('Auto-refresh triggered at', now.toLocaleTimeString())
-            refreshAllOrders()
+            
+            // Only refresh orders that haven't been updated in the last 4 hours
+            const orders = loadOrders()
+            const ordersToRefresh = orders.filter(order => {
+              const timeSinceLastUpdate = Date.now() - (order.lastUpdated || 0)
+              return timeSinceLastUpdate > FOUR_HOURS
+            })
+            
+            if (ordersToRefresh.length > 0) {
+              console.log(`Refreshing ${ordersToRefresh.length} orders that are older than 4 hours`)
+              ordersToRefresh.forEach(order => {
+                refreshOrder(order.shopNumber, order.orderNumber)
+              })
+            } else {
+              console.log('No orders need refreshing (all updated within last 4 hours)')
+            }
           } else {
             console.log('Auto-refresh skipped - outside active hours (7am-10pm)')
           }
         }
 
-        // Initial check after 1 minute, then repeat every 4 hours
-        setTimeout(() => {
-          checkAndRefresh()
-          setInterval(checkAndRefresh, FOUR_HOURS)
-        }, 60 * 1000)
+        // Trigger immediate refresh on page load
+        console.log('Triggering immediate refresh on page load')
+        smartRefreshOrders()
+        
+        // Then repeat every 1 hour
+        setInterval(smartRefreshOrders, 60 * 60 * 1000) // 1 hour in milliseconds
       }
 
       // Public API
