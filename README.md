@@ -2,7 +2,7 @@
 
 Track your DM Fotoparadise photo printing orders in real-time.
 
-**🚀 [Try it here](https://simon300000.github.io/fotoparadies-order-status/)**
+**🚀 [Try it here](https://foto.mwb.moe)**
 
 ## How to use
 
