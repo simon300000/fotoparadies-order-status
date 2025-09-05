@@ -54,6 +54,10 @@
       @apply status-badge bg-processing text-gray-900;
     }
 
+    .status-shipped {
+      @apply status-badge bg-blue-500 text-white;
+    }
+
     .status-delivered {
       @apply status-badge bg-success text-white;
     }
@@ -78,6 +82,12 @@
       background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05));
       backdrop-filter: blur(10px);
       border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .order-card-shipped {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(99, 102, 241, 0.05));
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(99, 102, 241, 0.3);
     }
 
     .order-card-delivered {
@@ -188,8 +198,7 @@
 
   <footer class="bg-white border-t py-8 mt-12">
     <div class="container mx-auto px-4 text-center text-gray-600 text-sm">
-      <p>DM Fotoparadise Order Tracker &copy; <span id="current-year"></span> | Auto-checks every hour, refreshes orders older than 4 hours (7am-10pm)</p>
-      <p class="mt-1">Data is stored locally in your browser and never sent to any server</p>
+      <p>DM Fotoparadise Order Tracker &copy; <span id="current-year"></span> | Auto-checks every hour, refreshes orders older than 4 hours</p>
     </div>
   </footer>
 
@@ -249,6 +258,12 @@
           text: 'Processing',
           cardClass: 'order-card-processing'
         },
+        SHIPPED: {
+          class: 'status-shipped',
+          icon: 'fa-truck',
+          text: 'Shipped',
+          cardClass: 'order-card-shipped'
+        },
         DELIVERED: {
           class: 'status-delivered',
           icon: 'fa-check-double',
@@ -299,7 +314,9 @@
 
       // Status mapping functions - now using centralized config
       const mapApiStatusToAppStatus = (apiStatus) => {
-        return apiStatus === 'DELIVERED' ? 'DELIVERED' : 'PROCESSING'
+        if (apiStatus === 'DELIVERED') return 'DELIVERED'
+        if (apiStatus === 'SHIPPED') return 'SHIPPED'
+        return 'PROCESSING'
       }
 
       const getStatusBadge = (status) => {
@@ -547,6 +564,40 @@
         })
       }
 
+      // Create subOrders section HTML
+      const createSubOrdersSection = (subOrders) => {
+        if (!subOrders || subOrders.length === 0) return ''
+        
+        const subOrdersHTML = subOrders.map(subOrder => {
+          const positionsHTML = subOrder.positions && subOrder.positions.length > 0 ?
+            subOrder.positions.map(position => `
+              <div class="flex justify-between items-start py-1">
+                <span class="text-sm text-gray-700 flex-1">${position.description || 'Item'}</span>
+                <span class="text-sm font-medium text-gray-900 ml-2">${position.quantity || 1}x</span>
+              </div>
+            `).join('') : 
+            '<div class="text-sm text-gray-500 italic">No items listed</div>'
+          
+          return `
+            <div class="bg-white/20 backdrop-blur-sm rounded-lg p-3 mb-2">
+              <div class="space-y-0.5">
+                ${positionsHTML}
+              </div>
+            </div>
+          `
+        }).join('')
+        
+        return `
+          <div class="mt-3 pt-3 border-t border-white/30">
+            <div class="flex items-center gap-2 mb-2">
+              <i class="fas fa-list-ul text-gray-600"></i>
+              <span class="font-medium text-sm text-gray-700">Order Details</span>
+            </div>
+            ${subOrdersHTML}
+          </div>
+        `
+      }
+
       // Create an order card for the UI
       const createOrderCard = (order) => {
         // Get status information
@@ -595,6 +646,8 @@
           '<i class="fas fa-spinner fa-spin mr-1"></i> Refreshing...' :
           '<i class="fas fa-redo mr-1"></i> Refresh'
 
+        const officialStatusUrl = `https://www.fotoparadies.de/service/auftragsstatus.html#/?orderid=${order.orderNumber}&locationid=${order.shopNumber}`
+
         return `
           <div class="order-card ${cardClass} rounded-xl shadow-lg overflow-hidden h-fit">
             <div class="p-4 border-b border-white/20">
@@ -621,20 +674,34 @@
               ${deliverySection}
               ${priceSection}
               
+              ${order.data?.subOrders ? createSubOrdersSection(order.data.subOrders) : ''}
+              
               <div class="flex flex-col gap-2 text-sm text-gray-600 pt-2 border-t border-white/20">
                 <div class="flex items-center">
                   <i class="fas fa-sync-alt mr-1"></i>
                   <span class="truncate">${lastUpdated}</span>
                 </div>
-                <div class="flex justify-between">
-                  <button 
-                    class="refresh-order-btn flex items-center text-sm ${order.isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:text-primary'}"
-                    data-shop="${order.shopNumber}"
-                    data-order="${order.orderNumber}"
-                    ${order.isLoading ? 'disabled' : ''}
-                  >
-                    ${refreshButtonContent}
-                  </button>
+                <div class="flex justify-between items-center">
+                  <div class="flex items-center gap-3">
+                    <button 
+                      class="refresh-order-btn flex items-center text-sm ${order.isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:text-primary'}"
+                      data-shop="${order.shopNumber}"
+                      data-order="${order.orderNumber}"
+                      ${order.isLoading ? 'disabled' : ''}
+                    >
+                      ${refreshButtonContent}
+                    </button>
+                    <a 
+                      href="${officialStatusUrl}" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      class="flex items-center text-sm text-gray-500 hover:text-primary"
+                      title="View on official Fotoparadies status page"
+                    >
+                      <i class="fas fa-external-link-alt mr-1"></i>
+                      Official
+                    </a>
+                  </div>
                   <button 
                     class="remove-order-btn text-gray-500 hover:text-error"
                     data-shop="${order.shopNumber}"
@@ -652,28 +719,22 @@
       const startSmartAutoRefresh = () => {
         const smartRefreshOrders = () => {
           const now = new Date()
-          const currentHour = now.getHours()
+          console.log('Auto-refresh triggered at', now.toLocaleTimeString())
           
-          if (currentHour >= ACTIVE_HOURS.start && currentHour < ACTIVE_HOURS.end) {
-            console.log('Auto-refresh triggered at', now.toLocaleTimeString())
-            
-            // Only refresh orders that haven't been updated in the last 4 hours
-            const orders = loadOrders()
-            const ordersToRefresh = orders.filter(order => {
-              const timeSinceLastUpdate = Date.now() - (order.lastUpdated || 0)
-              return timeSinceLastUpdate > FOUR_HOURS
+          // Only refresh orders that haven't been updated in the last 4 hours
+          const orders = loadOrders()
+          const ordersToRefresh = orders.filter(order => {
+            const timeSinceLastUpdate = Date.now() - (order.lastUpdated || 0)
+            return timeSinceLastUpdate > FOUR_HOURS
+          })
+          
+          if (ordersToRefresh.length > 0) {
+            console.log(`Refreshing ${ordersToRefresh.length} orders that are older than 4 hours`)
+            ordersToRefresh.forEach(order => {
+              refreshOrder(order.shopNumber, order.orderNumber)
             })
-            
-            if (ordersToRefresh.length > 0) {
-              console.log(`Refreshing ${ordersToRefresh.length} orders that are older than 4 hours`)
-              ordersToRefresh.forEach(order => {
-                refreshOrder(order.shopNumber, order.orderNumber)
-              })
-            } else {
-              console.log('No orders need refreshing (all updated within last 4 hours)')
-            }
           } else {
-            console.log('Auto-refresh skipped - outside active hours (7am-10pm)')
+            console.log('No orders need refreshing (all updated within last 4 hours)')
           }
         }
 

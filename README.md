@@ -8,7 +8,7 @@ Track your DM Fotoparadise photo printing orders in real-time.
 
 1. Enter your shop number and order number
 2. Click "Track Order"
-3. Orders automatically refresh every hour during business hours (7am-10pm)
+3. Orders automatically refresh every hour (24/7)
 
 ## Features
 
@@ -17,10 +17,6 @@ Track your DM Fotoparadise photo printing orders in real-time.
 - All data stored locally in your browser
 - Works on all devices
 - No registration required
-
-## Privacy
-
-Your order data stays in your browser and is never sent to external servers.
 
 ## License
 
