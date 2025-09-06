@@ -573,6 +573,14 @@
       const createSubOrdersSection = (subOrders) => {
         if (!subOrders || subOrders.length === 0) return ''
         
+        // Check if any subOrder has positions with items
+        const hasItems = subOrders.some(subOrder => 
+          subOrder.positions && subOrder.positions.length > 0
+        )
+        
+        // If no items exist, don't show Order Details section at all
+        if (!hasItems) return ''
+        
         const subOrdersHTML = subOrders.map(subOrder => {
           const positionsHTML = subOrder.positions && subOrder.positions.length > 0 ?
             subOrder.positions.map(position => `
@@ -580,16 +588,15 @@
                 <span class="text-sm text-gray-700 flex-1">${position.description || 'Item'}</span>
                 <span class="text-sm font-medium text-gray-900 ml-2">${position.quantity || 1}x</span>
               </div>
-            `).join('') : 
-            '<div class="text-sm text-gray-500 italic">No items listed</div>'
+            `).join('') : ''
           
-          return `
+          return positionsHTML ? `
             <div class="bg-white/20 backdrop-blur-sm rounded-lg p-3 mb-2">
               <div class="space-y-0.5">
                 ${positionsHTML}
               </div>
             </div>
-          `
+          ` : ''
         }).join('')
         
         return `
