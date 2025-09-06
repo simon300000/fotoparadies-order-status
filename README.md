@@ -4,6 +4,8 @@ Track your DM Fotoparadise photo printing orders in real-time.
 
 **🚀 [Try it here](https://foto.mwb.moe)**
 
+![Example Screenshot](example.png)
+
 ## How to use
 
 1. Enter your shop number and order number
