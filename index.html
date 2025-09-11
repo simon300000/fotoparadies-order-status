@@ -751,20 +751,20 @@
           const now = new Date()
           console.log('Auto-refresh triggered at', now.toLocaleTimeString())
           
-          // Only refresh orders that haven't been updated in the last 4 hours
+          // Only refresh orders that haven't been updated in the last 4 hours and are not delivered
           const orders = loadOrders()
           const ordersToRefresh = orders.filter(order => {
             const timeSinceLastUpdate = Date.now() - (order.lastUpdated || 0)
-            return timeSinceLastUpdate > FOUR_HOURS
+            return timeSinceLastUpdate > FOUR_HOURS && order.status !== 'DELIVERED'
           })
           
           if (ordersToRefresh.length > 0) {
-            console.log(`Refreshing ${ordersToRefresh.length} orders that are older than 4 hours`)
+            console.log(`Refreshing ${ordersToRefresh.length} orders that are older than 4 hours (skipping delivered orders)`)
             ordersToRefresh.forEach(order => {
               refreshOrder(order.shopNumber, order.orderNumber)
             })
           } else {
-            console.log('No orders need refreshing (all updated within last 4 hours)')
+            console.log('No orders need refreshing (all updated within last 4 hours or delivered)')
           }
         }
 
