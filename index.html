@@ -111,6 +111,32 @@
       white-space: pre-line;
     }
 
+    /* Collapsible collected orders section */
+    .collected-section-header {
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .collected-section-header:hover {
+      background: linear-gradient(135deg, rgba(156, 163, 175, 0.15), rgba(156, 163, 175, 0.08));
+    }
+
+    .collected-orders-container {
+      transition: all 0.3s ease;
+      overflow: hidden;
+    }
+
+    .collected-orders-container.collapsed {
+      max-height: 0;
+      opacity: 0;
+      margin-top: 0;
+    }
+
+    .collected-orders-container:not(.collapsed) {
+      max-height: none;
+      opacity: 1;
+    }
+
   </style>
 </head>
 
@@ -574,12 +600,9 @@
       const renderOrders = (orders) => {
         saveOrders(orders)
 
-        // Sort orders: collected orders at the end
-        const sortedOrders = [...orders].sort((a, b) => {
-          if (a.collected && !b.collected) return 1
-          if (!a.collected && b.collected) return -1
-          return 0
-        })
+        // Separate active and collected orders
+        const activeOrders = orders.filter(order => !order.collected)
+        const collectedOrders = orders.filter(order => order.collected)
 
         // Update order count
         elements.orderCount.textContent = `${orders.length} ${orders.length === 1 ? 'order' : 'orders'}`
@@ -587,9 +610,38 @@
         // Toggle placeholder visibility
         elements.noOrdersPlaceholder.classList.toggle('hidden', orders.length > 0)
 
-        // Generate HTML for all orders
-        const ordersHTML = sortedOrders.map(createOrderCard).join('')
-        elements.ordersContainer.innerHTML = ordersHTML
+        // Generate HTML for active orders
+        const activeOrdersHTML = activeOrders.map(createOrderCard).join('')
+
+        // Generate HTML for collected orders section
+        let collectedSectionHTML = ''
+        if (collectedOrders.length > 0) {
+          const collectedOrdersHTML = collectedOrders.map(createOrderCard).join('')
+          const isCollapsed = localStorage.getItem('collectedOrdersCollapsed') === 'true'
+
+          collectedSectionHTML = `
+            <div class="col-span-full">
+              <div class="collected-section-header bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-4 transition-colors duration-300"
+                   onclick="orderTracker.toggleCollectedOrders()">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center">
+                    <i class="fas fa-check-circle text-gray-500 mr-3"></i>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                      Collected Orders (${collectedOrders.length})
+                    </h3>
+                  </div>
+                  <i class="fas fa-chevron-${isCollapsed ? 'down' : 'up'} text-gray-500 transition-transform duration-300"></i>
+                </div>
+              </div>
+              <div class="collected-orders-container grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 ${isCollapsed ? 'collapsed' : ''}">
+                ${collectedOrdersHTML}
+              </div>
+            </div>
+          `
+        }
+
+        // Combine active orders and collected section
+        elements.ordersContainer.innerHTML = activeOrdersHTML + collectedSectionHTML
 
         // Attach event listeners
         attachOrderEventListeners()
@@ -842,8 +894,27 @@
         }
       }
 
+      const toggleCollectedOrders = () => {
+        const isCurrentlyCollapsed = localStorage.getItem('collectedOrdersCollapsed') === 'true'
+        const newCollapsedState = !isCurrentlyCollapsed
+
+        localStorage.setItem('collectedOrdersCollapsed', newCollapsedState.toString())
+
+        // Update the UI
+        const container = document.querySelector('.collected-orders-container')
+        const chevron = document.querySelector('.collected-section-header i.fa-chevron-up, .collected-section-header i.fa-chevron-down')
+
+        if (container) {
+          container.classList.toggle('collapsed', newCollapsedState)
+        }
+
+        if (chevron) {
+          chevron.className = chevron.className.replace(/fa-chevron-(up|down)/, `fa-chevron-${newCollapsedState ? 'down' : 'up'}`)
+        }
+      }
+
       // Public API
-      return { init, refreshAllOrders }
+      return { init, refreshAllOrders, toggleCollectedOrders }
     })()
   </script>
 </body>
