@@ -99,6 +99,13 @@
       border: 1px solid rgba(107, 114, 128, 0.2);
     }
 
+    .order-card-collected {
+      background: linear-gradient(135deg, rgba(156, 163, 175, 0.1), rgba(156, 163, 175, 0.05));
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(156, 163, 175, 0.2);
+      opacity: 0.7;
+    }
+
     /* Styling for the delivery address */
     .delivery-address {
       white-space: pre-line;
@@ -271,6 +278,12 @@
           icon: 'fa-check-double',
           text: 'Delivered',
           cardClass: 'order-card-delivered'
+        },
+        COLLECTED: {
+          class: 'status-collected',
+          icon: 'fa-check-circle',
+          text: 'Collected',
+          cardClass: 'order-card-collected'
         }
       }
 
@@ -340,6 +353,9 @@
           case 'DELIVERED':
             badgeClasses += 'bg-green-500 text-white'
             break
+          case 'COLLECTED':
+            badgeClasses += 'bg-gray-500 text-white'
+            break
           default:
             badgeClasses += 'bg-gray-400 text-white dark:bg-gray-600 dark:text-white'
         }
@@ -347,7 +363,8 @@
         return `<span class="${badgeClasses}"><i class="fas ${config.icon} mr-1"></i> ${config.text}</span>`
       }
 
-      const getCardClass = (status, summaryStateCode) => {
+      const getCardClass = (status, summaryStateCode, collected) => {
+        if (collected) return 'order-card-collected'
         const statusToCheck = summaryStateCode || status
         const config = STATUS_CONFIG[statusToCheck] || STATUS_CONFIG
         return config.cardClass || 'order-card-default'
@@ -464,7 +481,9 @@
           lastUpdated: 0,
           data: null,
           status: 'LOADING',
-          isLoading: true
+          isLoading: true,
+          collected: false,
+          collectionDate: null
         }
 
         orders.unshift(newOrder)
@@ -555,6 +574,13 @@
       const renderOrders = (orders) => {
         saveOrders(orders)
 
+        // Sort orders: collected orders at the end
+        const sortedOrders = [...orders].sort((a, b) => {
+          if (a.collected && !b.collected) return 1
+          if (!a.collected && b.collected) return -1
+          return 0
+        })
+
         // Update order count
         elements.orderCount.textContent = `${orders.length} ${orders.length === 1 ? 'order' : 'orders'}`
 
@@ -562,7 +588,7 @@
         elements.noOrdersPlaceholder.classList.toggle('hidden', orders.length > 0)
 
         // Generate HTML for all orders
-        const ordersHTML = orders.map(createOrderCard).join('')
+        const ordersHTML = sortedOrders.map(createOrderCard).join('')
         elements.ordersContainer.innerHTML = ordersHTML
 
         // Attach event listeners
@@ -583,6 +609,14 @@
             const shop = this.getAttribute('data-shop')
             const orderNumber = this.getAttribute('data-order')
             refreshOrder(shop, orderNumber)
+          })
+        })
+
+        document.querySelectorAll('.collected-checkbox').forEach(checkbox => {
+          checkbox.addEventListener('change', function() {
+            const shop = this.getAttribute('data-shop')
+            const orderNumber = this.getAttribute('data-order')
+            toggleCollectedStatus(shop, orderNumber, this.checked)
           })
         })
       }
@@ -632,13 +666,13 @@
       const createOrderCard = (order) => {
         // Get status information
         let statusText = "Loading order information..."
-        let statusBadge = getStatusBadge(order.status)
-        let cardClass = getCardClass(order.status)
+        let statusBadge = getStatusBadge(order.collected ? 'COLLECTED' : order.status)
+        let cardClass = getCardClass(order.status, null, order.collected)
 
         if (order.data) {
           statusText = order.data.summaryStateText || "Status information available"
-          statusBadge = getStatusBadge(order.data.summaryStateCode || order.status)
-          cardClass = getCardClass(order.status, order.data.summaryStateCode)
+          statusBadge = getStatusBadge(order.collected ? 'COLLECTED' : (order.data.summaryStateCode || order.status))
+          cardClass = getCardClass(order.status, order.data.summaryStateCode, order.collected)
         } else if (order.errorMessage) {
           statusText = order.errorMessage || "Failed to load order information"
         }
@@ -650,6 +684,11 @@
         const orderDateSection = order.data?.orderDate ? `
           <div class="text-sm text-gray-600 dark:text-gray-300 mb-2">
             Order: ${new Date(order.data.orderDate).toLocaleDateString()}
+          </div>` : ''
+
+        const collectionDateSection = order.collected && order.collectionDate ? `
+          <div class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+            Collected: ${new Date(order.collectionDate).toLocaleDateString()}
           </div>` : ''
 
         const deliverySection = order.data?.deliveryText ? `
@@ -687,6 +726,7 @@
                   <div class="text-sm text-gray-600 dark:text-gray-300 mb-2">Shop: ${order.shopNumber}</div>
                   <div class="text-sm text-gray-600 dark:text-gray-300 mb-2">Added: ${new Date(order.createdAt || 0).toLocaleDateString()}</div>
                   ${orderDateSection}
+                  ${collectionDateSection}
                 </div>
                 <div class="flex-shrink-0">${statusBadge}</div>
               </div>
@@ -713,7 +753,7 @@
                 </div>
                 <div class="flex justify-between items-center">
                   <div class="flex items-center gap-3">
-                    <button 
+                    <button
                       class="refresh-order-btn flex items-center text-sm ${order.isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:text-primary'}"
                       data-shop="${order.shopNumber}"
                       data-order="${order.orderNumber}"
@@ -721,9 +761,9 @@
                     >
                       ${refreshButtonContent}
                     </button>
-                    <a 
-                      href="${officialStatusUrl}" 
-                      target="_blank" 
+                    <a
+                      href="${officialStatusUrl}"
+                      target="_blank"
                       rel="noopener noreferrer"
                       class="flex items-center text-sm text-gray-500 dark:text-gray-400 hover:text-primary"
                       title="View on official Fotoparadies status page"
@@ -732,13 +772,25 @@
                       Official
                     </a>
                   </div>
-                  <button 
-                    class="remove-order-btn text-gray-500 dark:text-gray-400 hover:text-error"
-                    data-shop="${order.shopNumber}"
-                    data-order="${order.orderNumber}"
-                  >
-                    <i class="fas fa-trash"></i>
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <label class="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        class="collected-checkbox mr-1"
+                        data-shop="${order.shopNumber}"
+                        data-order="${order.orderNumber}"
+                        ${order.collected ? 'checked' : ''}
+                      >
+                      <span class="text-xs text-gray-600 dark:text-gray-400">Collected</span>
+                    </label>
+                    <button
+                      class="remove-order-btn text-gray-500 dark:text-gray-400 hover:text-error"
+                      data-shop="${order.shopNumber}"
+                      data-order="${order.orderNumber}"
+                    >
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -755,16 +807,16 @@
           const orders = loadOrders()
           const ordersToRefresh = orders.filter(order => {
             const timeSinceLastUpdate = Date.now() - (order.lastUpdated || 0)
-            return timeSinceLastUpdate > FOUR_HOURS && order.status !== 'DELIVERED'
+            return timeSinceLastUpdate > FOUR_HOURS && order.status !== 'DELIVERED' && !order.collected
           })
           
           if (ordersToRefresh.length > 0) {
-            console.log(`Refreshing ${ordersToRefresh.length} orders that are older than 4 hours (skipping delivered orders)`)
+            console.log(`Refreshing ${ordersToRefresh.length} orders that are older than 4 hours (skipping delivered and collected orders)`)
             ordersToRefresh.forEach(order => {
               refreshOrder(order.shopNumber, order.orderNumber)
             })
           } else {
-            console.log('No orders need refreshing (all updated within last 4 hours or delivered)')
+            console.log('No orders need refreshing (all updated within last 4 hours, delivered, or collected)')
           }
         }
 
@@ -774,6 +826,20 @@
         
         // Then repeat every 1 hour
         setInterval(smartRefreshOrders, 60 * 60 * 1000) // 1 hour in milliseconds
+      }
+
+      const toggleCollectedStatus = (shopNumber, orderNumber, collected) => {
+        const orders = loadOrders()
+        const orderIndex = orders.findIndex(order =>
+          order.shopNumber === shopNumber && order.orderNumber === orderNumber
+        )
+
+        if (orderIndex !== -1) {
+          orders[orderIndex].collected = collected
+          orders[orderIndex].collectionDate = collected ? Date.now() : null
+          saveOrders(orders)
+          renderOrders(orders)
+        }
       }
 
       // Public API
