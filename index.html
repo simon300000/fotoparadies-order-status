@@ -81,6 +81,12 @@
       border: 1px solid rgba(59, 130, 246, 0.3);
     }
 
+    .order-card-produced {
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(139, 92, 246, 0.05));
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
     .order-card-shipped {
       background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(99, 102, 241, 0.05));
       backdrop-filter: blur(10px);
@@ -293,6 +299,12 @@
           text: 'Processing',
           cardClass: 'order-card-processing'
         },
+        PRODUCED: {
+          class: 'status-produced',
+          icon: 'fa-check',
+          text: 'Produced',
+          cardClass: 'order-card-produced'
+        },
         SHIPPED: {
           class: 'status-shipped',
           icon: 'fa-truck',
@@ -357,15 +369,16 @@
       const mapApiStatusToAppStatus = (apiStatus) => {
         if (apiStatus === 'DELIVERED') return 'DELIVERED'
         if (apiStatus === 'SHIPPED') return 'SHIPPED'
+        if (apiStatus === 'PRODUCED') return 'PRODUCED'
         return 'PROCESSING'
       }
 
       const getStatusBadge = (status) => {
         const config = STATUS_CONFIG[status] || STATUS_CONFIG.LOADING
-        
+
         // Use direct Tailwind classes instead of CSS @apply
         let badgeClasses = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium '
-        
+
         switch(status) {
           case 'LOADING':
             badgeClasses += 'bg-gray-400 text-white dark:bg-gray-600 dark:text-white'
@@ -373,8 +386,11 @@
           case 'PROCESSING':
             badgeClasses += 'bg-blue-500 text-white'
             break
+          case 'PRODUCED':
+            badgeClasses += 'bg-violet-500 text-white'
+            break
           case 'SHIPPED':
-            badgeClasses += 'bg-purple-500 text-white'
+            badgeClasses += 'bg-indigo-500 text-white'
             break
           case 'DELIVERED':
             badgeClasses += 'bg-green-500 text-white'
@@ -385,7 +401,7 @@
           default:
             badgeClasses += 'bg-gray-400 text-white dark:bg-gray-600 dark:text-white'
         }
-        
+
         return `<span class="${badgeClasses}"><i class="fas ${config.icon} mr-1"></i> ${config.text}</span>`
       }
 
