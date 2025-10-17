@@ -15,7 +15,7 @@ Track your DM Fotoparadise photo printing orders in real-time.
 ## Features
 
 - Real-time order status tracking
-- Smart auto-refresh (only when needed)
+- Auto-refresh
 - All data stored locally in your browser
 - Works on all devices
 - No registration required
