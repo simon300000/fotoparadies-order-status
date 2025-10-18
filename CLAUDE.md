@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Architecture
 
-This is a single-page web application that tracks DM Fotoparadise photo printing orders. The entire application is contained in `index.html` with:
+This is a single-page web application that tracks DM Fotoparadies photo printing orders. The entire application is contained in `index.html` with:
 
 - **Frontend**: Vanilla HTML/CSS/JavaScript with Tailwind CSS for styling
 - **Data Storage**: Browser localStorage for client-side persistence
@@ -31,7 +31,7 @@ Status badges are generated dynamically in JavaScript using direct Tailwind clas
 
 ### API Configuration
 - Base URL: `https://spot.photoprintit.com/spotapi/orderInfo/forShop`
-- Config ID: `1320` (DM Fotoparadise specific)
+- Config ID: `1320` (DM Fotoparadies specific)
 - Parameters: shop number and order number
 
 ## Development Commands
