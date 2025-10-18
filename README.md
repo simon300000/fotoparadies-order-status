@@ -1,6 +1,6 @@
 # DM Fotoparadise Order Tracker
 
-Track your DM Fotoparadise photo printing orders in real-time.
+Track your DM Fotoparadise orders in real-time.
 
 **🚀 [Try it here](https://foto.mwb.moe)**
 
