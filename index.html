@@ -203,7 +203,12 @@
         <span id="order-count" class="ml-2 text-xs bg-gray-200 dark:bg-gray-700 dark:text-gray-300 rounded-full px-2 py-1 font-medium transition-colors duration-300">0 orders</span>
       </div>
 
-      <div class="flex space-x-2">
+      <div class="flex flex-wrap gap-2">
+        <label class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 dark:text-gray-200 px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-colors duration-300 cursor-pointer">
+          <input type="checkbox" id="url-sync-toggle" class="mr-2">
+          <i class="fas fa-link mr-1"></i>
+          URL Sync
+        </label>
         <button id="refresh-all-btn" class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 dark:text-gray-200 px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-colors duration-300">
           <i class="fas fa-sync-alt mr-1"></i>
           Refresh All
@@ -339,7 +344,8 @@
         confirmationModal: document.getElementById('confirmation-modal'),
         confirmBtn: document.getElementById('confirm-btn'),
         cancelBtn: document.getElementById('cancel-btn'),
-        confirmationMessage: document.getElementById('confirmation-message')
+        confirmationMessage: document.getElementById('confirmation-message'),
+        urlSyncToggle: document.getElementById('url-sync-toggle')
       }
 
       // Utility functions
@@ -352,6 +358,168 @@
 
       const saveOrders = (orders) => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(orders))
+        updateURL(orders)
+      }
+
+      // URL Sync Functions
+      const isUrlSyncEnabled = () => {
+        const enabled = localStorage.getItem('urlSyncEnabled')
+        return enabled === 'true' // Default to false
+      }
+
+      const setUrlSyncEnabled = (enabled) => {
+        localStorage.setItem('urlSyncEnabled', enabled.toString())
+        if (enabled) {
+          // If enabling, first import orders from URL, then update URL
+          const hash = window.location.hash
+          if (hash && hash.includes('orders=')) {
+            // Import orders from URL first
+            try {
+              const encoded = hash.split('orders=')[1]
+              const jsonStr = atob(encoded)
+              const urlOrders = JSON.parse(jsonStr)
+
+              const existingOrders = loadOrders()
+              let hasNewOrders = false
+
+              // Add orders from URL that don't already exist
+              urlOrders.forEach(urlOrder => {
+                const exists = existingOrders.some(order =>
+                  order.shopNumber === urlOrder.s && order.orderNumber === urlOrder.o
+                )
+
+                if (!exists) {
+                  const newOrder = {
+                    shopNumber: urlOrder.s,
+                    orderNumber: urlOrder.o,
+                    createdAt: Date.now(),
+                    lastUpdated: 0,
+                    data: null,
+                    status: 'LOADING',
+                    isLoading: true,
+                    collected: false,
+                    collectionDate: null
+                  }
+                  existingOrders.unshift(newOrder)
+                  hasNewOrders = true
+
+                  // Fetch order status
+                  processOrder(urlOrder.s, urlOrder.o)
+                }
+              })
+
+              if (hasNewOrders) {
+                // Save will trigger updateURL automatically
+                saveOrders(existingOrders)
+                renderOrders(existingOrders)
+              } else {
+                // No new orders, just update URL with current orders
+                const orders = loadOrders()
+                updateURL(orders)
+              }
+            } catch (error) {
+              console.error('Failed to load orders from URL:', error)
+              // Still update URL even if import failed
+              const orders = loadOrders()
+              updateURL(orders)
+            }
+          } else {
+            // No orders in URL, just update URL with current orders
+            const orders = loadOrders()
+            updateURL(orders)
+          }
+        } else {
+          // If disabling, clear URL hash
+          if (window.location.hash) {
+            history.replaceState(null, '', window.location.pathname + window.location.search)
+          }
+        }
+      }
+
+      const updateURL = (orders) => {
+        // Only update URL if sync is enabled
+        if (!isUrlSyncEnabled()) {
+          return
+        }
+
+        // Get the latest 10 non-collected orders
+        const latest10 = orders
+          .filter(order => !order.collected)
+          .slice(0, 10)
+          .map(order => ({
+            s: order.shopNumber,
+            o: order.orderNumber
+          }))
+
+        if (latest10.length === 0) {
+          // Clear URL hash if no orders
+          if (window.location.hash) {
+            history.replaceState(null, '', window.location.pathname + window.location.search)
+          }
+          return
+        }
+
+        try {
+          const jsonStr = JSON.stringify(latest10)
+          const encoded = btoa(jsonStr)
+          history.replaceState(null, '', `#orders=${encoded}`)
+        } catch (error) {
+          console.error('Failed to update URL:', error)
+        }
+      }
+
+      const loadOrdersFromURL = () => {
+        // Only load from URL if sync is enabled
+        if (!isUrlSyncEnabled()) {
+          return
+        }
+
+        const hash = window.location.hash
+        if (!hash || !hash.includes('orders=')) {
+          return
+        }
+
+        try {
+          const encoded = hash.split('orders=')[1]
+          const jsonStr = atob(encoded)
+          const urlOrders = JSON.parse(jsonStr)
+
+          const existingOrders = loadOrders()
+          let hasNewOrders = false
+
+          // Add orders from URL that don't already exist
+          urlOrders.forEach(urlOrder => {
+            const exists = existingOrders.some(order =>
+              order.shopNumber === urlOrder.s && order.orderNumber === urlOrder.o
+            )
+
+            if (!exists) {
+              const newOrder = {
+                shopNumber: urlOrder.s,
+                orderNumber: urlOrder.o,
+                createdAt: Date.now(),
+                lastUpdated: 0,
+                data: null,
+                status: 'LOADING',
+                isLoading: true,
+                collected: false,
+                collectionDate: null
+              }
+              existingOrders.push(newOrder)
+              hasNewOrders = true
+
+              // Fetch order status
+              processOrder(urlOrder.s, urlOrder.o)
+            }
+          })
+
+          if (hasNewOrders) {
+            saveOrders(existingOrders)
+            renderOrders(existingOrders)
+          }
+        } catch (error) {
+          console.error('Failed to load orders from URL:', error)
+        }
       }
 
       const loadSavedShopNumber = () => {
@@ -474,9 +642,16 @@
 
       // Initialize the tracker
       const init = () => {
+        // First load any orders from URL
+        loadOrdersFromURL()
+
         const orders = loadOrders()
         renderOrders(orders)
         loadSavedShopNumber()
+
+        // Initialize URL sync toggle state
+        elements.urlSyncToggle.checked = isUrlSyncEnabled()
+
         setupEventListeners()
         startSmartAutoRefresh()
       }
@@ -489,6 +664,11 @@
         elements.scrollToFormBtn.addEventListener('click', scrollToForm)
         elements.confirmBtn.addEventListener('click', handleClearOrders)
         elements.cancelBtn.addEventListener('click', hideConfirmationModal)
+        elements.urlSyncToggle.addEventListener('change', handleUrlSyncToggle)
+      }
+
+      const handleUrlSyncToggle = (e) => {
+        setUrlSyncEnabled(e.target.checked)
       }
 
       // Event handlers
