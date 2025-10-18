@@ -1,6 +1,6 @@
-# DM Fotoparadise Order Tracker
+# DM Fotoparadies Order Tracker
 
-Track your DM Fotoparadise orders in real-time.
+Track your DM Fotoparadies orders in real-time.
 
 **🚀 [Try it here](https://foto.mwb.moe)**
 
@@ -24,4 +24,4 @@ Track your DM Fotoparadise orders in real-time.
 
 ## License
 
-This project is for personal use only. DM and Fotoparadise are trademarks of their respective owners.
+This project is for personal use only. DM and Fotoparadies are trademarks of their respective owners.
