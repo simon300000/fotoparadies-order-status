@@ -172,7 +172,7 @@
         <div>
           <label for="shop-number" class="block mb-1 font-medium text-gray-700 dark:text-gray-300">
             <i class="fas fa-store mr-1 text-primary"></i>
-            Shop/Filiale Number
+            Shop/Filiale Number <span id="shop-optional-hint" class="text-xs text-gray-500 dark:text-gray-400 hidden">(optional for 12 digit order ID)</span>
           </label>
           <input type="text" id="shop-number" placeholder="e.g., 1234" required class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors duration-300">
         </div>
@@ -283,6 +283,7 @@
       // Constants
       const STORAGE_KEY = 'dmfoto_orders'
       const API_BASE_URL = 'https://spot.photoprintit.com/spotapi/orderInfo/forShop'
+      const ORDER_API_BASE_URL = 'https://spot.photoprintit.com/spotapi/orderInfo/order'
       const CONFIG_ID = '1320'
       const FOUR_HOURS = 4 * 60 * 60 * 1000
       const ACTIVE_HOURS = { start: 7, end: 22 }
@@ -335,6 +336,7 @@
         orderCount: document.getElementById('order-count'),
         shopNumberInput: document.getElementById('shop-number'),
         orderNumberInput: document.getElementById('order-number'),
+        shopOptionalHint: document.getElementById('shop-optional-hint'),
         refreshAllBtn: document.getElementById('refresh-all-btn'),
         clearAllBtn: document.getElementById('clear-all-btn'),
         scrollToFormBtn: document.getElementById('scroll-to-form-btn'),
@@ -347,7 +349,13 @@
 
       // Utility functions
       const showError = (message) => alert(`Error: ${message}`)
-      
+
+      const isFullOrderId = (orderNumber) => {
+        // Remove dashes and check if it's exactly 12 digits
+        const cleanOrderNumber = orderNumber.replace(/-/g, '')
+        return /^\d{12}$/.test(cleanOrderNumber)
+      }
+
       const loadOrders = () => {
         const ordersJSON = localStorage.getItem(STORAGE_KEY)
         return ordersJSON ? JSON.parse(ordersJSON) : []
@@ -530,6 +538,20 @@
         localStorage.setItem('lastShopNumber', shopNumber)
       }
 
+      const handleOrderNumberInput = () => {
+        const orderNumber = elements.orderNumberInput.value.trim()
+
+        if (isFullOrderId(orderNumber)) {
+          // If order number is a valid 12-digit ID, make shop number optional
+          elements.shopNumberInput.removeAttribute('required')
+          elements.shopOptionalHint.classList.remove('hidden')
+        } else {
+          // Otherwise, shop number is required
+          elements.shopNumberInput.setAttribute('required', 'required')
+          elements.shopOptionalHint.classList.add('hidden')
+        }
+      }
+
       // Status mapping functions - now using centralized config
       const mapApiStatusToAppStatus = (apiStatus) => {
         if (apiStatus === 'DELIVERED') return 'DELIVERED'
@@ -579,7 +601,15 @@
 
       // API and Order Management
       const fetchOrderStatus = async (shopNumber, orderNumber) => {
-        const url = `${API_BASE_URL}?config=${CONFIG_ID}&shop=${shopNumber}&order=${orderNumber}`
+        // Use different endpoint based on whether shop number is provided
+        let url
+        if (!shopNumber && isFullOrderId(orderNumber)) {
+          // Use full order ID endpoint
+          url = `${ORDER_API_BASE_URL}?config=${CONFIG_ID}&fullOrderId=${orderNumber.replace(/-/g, '')}`
+        } else {
+          // Use shop-based endpoint
+          url = `${API_BASE_URL}?config=${CONFIG_ID}&shop=${shopNumber}&order=${orderNumber}`
+        }
 
         try {
           const response = await fetch(url)
@@ -656,6 +686,7 @@
       // Setup all event listeners
       const setupEventListeners = () => {
         elements.form.addEventListener('submit', handleAddOrder)
+        elements.orderNumberInput.addEventListener('input', handleOrderNumberInput)
         elements.refreshAllBtn.addEventListener('click', refreshAllOrders)
         elements.clearAllBtn.addEventListener('click', showClearConfirmation)
         elements.scrollToFormBtn.addEventListener('click', scrollToForm)
@@ -675,11 +706,6 @@
         const shopNumber = elements.shopNumberInput.value.trim()
         const orderNumber = elements.orderNumberInput.value.trim()
 
-        if (!shopNumber || !orderNumber) {
-          showError("Please enter both shop and order numbers")
-          return
-        }
-
         const orders = loadOrders()
         const exists = orders.some(order =>
           order.shopNumber === shopNumber && order.orderNumber === orderNumber
@@ -690,7 +716,9 @@
           return
         }
 
-        saveShopNumber(shopNumber)
+        if (shopNumber) {
+          saveShopNumber(shopNumber)
+        }
 
         // Create new order
         const newOrder = {
@@ -960,7 +988,9 @@
           '<i class="fas fa-spinner fa-spin mr-1"></i> Refreshing...' :
           '<i class="fas fa-redo mr-1"></i> Refresh'
 
-        const officialStatusUrl = `https://www.fotoparadies.de/service/auftragsstatus.html#/?orderid=${order.orderNumber}&locationid=${order.shopNumber}`
+        const officialStatusUrl = order.shopNumber
+          ? `https://www.fotoparadies.de/service/auftragsstatus.html#/?orderid=${order.orderNumber}&locationid=${order.shopNumber}`
+          : `https://www.fotoparadies.de/service/auftragsstatus.html#/?orderid=${order.orderNumber}`
 
         return `
           <div class="order-card ${cardClass} rounded-xl shadow-lg overflow-hidden h-fit">
@@ -968,7 +998,7 @@
               <div class="flex flex-col gap-2">
                 <div class="flex-1 min-w-0">
                   <h3 class="text-lg font-semibold truncate text-gray-900 dark:text-white">#${order.orderNumber}</h3>
-                  <div class="text-sm text-gray-600 dark:text-gray-300 mb-2">Shop: ${order.shopNumber}</div>
+                  <div class="text-sm text-gray-600 dark:text-gray-300 mb-2">${order.shopNumber ? `Shop: ${order.shopNumber}` : 'Direct Order ID'}</div>
                   <div class="text-sm text-gray-600 dark:text-gray-300 mb-2">Added: ${new Date(order.createdAt || 0).toLocaleDateString()}</div>
                   ${orderDateSection}
                   ${collectionDateSection}
